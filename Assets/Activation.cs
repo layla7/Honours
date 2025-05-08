@@ -1,9 +1,6 @@
 using UnityEngine;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Threading;
-using UnityEngine.SceneManagement;
 using Melanchall.DryWetMidi.Multimedia;
 using System.Linq;
 
@@ -14,7 +11,6 @@ public class Activation : MonoBehaviour
     private static IInputDevice drumkit;
 
     private CrashCymbal crash;
-    private RideCymbal ride;
     private BassDrum bass;
     private Toms toms;
     private Spinner spinner;
@@ -26,14 +22,21 @@ public class Activation : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        //Device name midi interpreter used in development by default
         deviceName = "UMC204HD 192k";
+
+        //Get all midi devices connected to system
         var devices = InputDevice.GetAll();
+        //If devices, set to first listed
         if (devices != null && devices.Any())
         {
             deviceName = devices.First().Name;
             Debug.Log(deviceName);
         }
+        
         getDrums();
+
+        //Try to set up event listening on midi device
         try
         {
             drumkit = InputDevice.GetByName(deviceName);
@@ -49,8 +52,10 @@ public class Activation : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        //Exit program using escape key
         if (Input.GetKeyDown(KeyCode.Escape))
         {
+            //Stop editor if in unity dev, otherwise exit program
             #if UNITY_EDITOR
                         UnityEditor.EditorApplication.isPlaying = false;
             #else
@@ -59,16 +64,18 @@ public class Activation : MonoBehaviour
         }
     }
 
+    //If stopping program, properly dispose of the drum kit, otherwise issues
     void OnApplicationQuit()
     {
         (drumkit as IDisposable)?.Dispose();
     }
 
+    //Drumkit event handler
     private void OnEventReceived(object sender, MidiEventReceivedEventArgs e){
-        var midiDevice = (MidiDevice)sender;
-
-        
-        if (e.Event.EventType.ToString() == "NoteOn") {
+        //Check if event is a note being played
+        if (e.Event.EventType.ToString() == "NoteOn")
+        {
+            //Format string to get note number and strength as integers
             Dictionary<String, int> hitInfo = new Dictionary<String, int>
             {
                 { "note", int.Parse(e.Event.ToString().Split(",")[0].Split("(")[1]) },
@@ -76,23 +83,19 @@ public class Activation : MonoBehaviour
             };
             Debug.Log(hitInfo["note"]);
             Debug.Log(hitInfo["strength"]);
-            
+            //Send hit to case statement
             sendHit(hitInfo);
-        } else if (e.Event.EventType.ToString() == "ControlChange")
+        }//If event is a hi-hat pedal change, set the pedal value in the spinner component
+        else if (e.Event.EventType.ToString() == "ControlChange")
         {
+            //Format and send new control value
             spinner.setPedal(int.Parse(e.Event.ToString().Split(",")[1].Split(")")[0]));
-            // Debug.Log(e.Event.ToString());
         }
-
-        //if (e.Event.ToString() == "Timing Clock" || e.Event.ToString() == "Active Sensing" || e.Event.ToString() == "Note Off") return;
-
-        //Debug.Log($"Event received from '{midiDevice.Name}' at {DateTime.Now.ToString("hh.mm.ss.ffffff")}: {e.Event.ToString()}");
-
-        //Debug.Log(e);
     }
 
     void sendHit(Dictionary<String, int> info)
     {
+        //send to effect handler based on note
         switch (info["note"])
         {
             case 49:
@@ -131,6 +134,7 @@ public class Activation : MonoBehaviour
         }
     }
 
+    //Get drum components in game.
     void getDrums() {
         crash = GameObject.Find("Crash Field").GetComponent<CrashCymbal>();
         bass = GameObject.Find("Bass Drum Field").GetComponent<BassDrum>();
